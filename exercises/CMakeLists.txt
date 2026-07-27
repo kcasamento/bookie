@@ -1,0 +1,8 @@
+add_subdirectory(01-value-semantics-and-raii)
+add_subdirectory(02-fixed-capacity-structures)
+add_subdirectory(03-order-book-core)
+add_subdirectory(04-testing-and-hygiene)
+add_subdirectory(05-benchmarking)
+add_subdirectory(06-concurrency)
+add_subdirectory(07-feed-and-latency)
+add_subdirectory(08-production-build)

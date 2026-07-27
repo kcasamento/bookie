@@ -1,0 +1,2 @@
+add_executable(ex03_order_book_core main.cpp)
+target_link_libraries(ex03_order_book_core PRIVATE orderbook)

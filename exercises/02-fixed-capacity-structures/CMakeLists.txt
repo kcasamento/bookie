@@ -1,0 +1,1 @@
+add_executable(ex02_fixed_capacity_structures main.cpp)
