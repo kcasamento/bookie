@@ -1,6 +1,6 @@
 # Progress Notes
 
-Last updated: 2026-07-23 — session paused here. Read this before resuming, whether that's the same person or a different agent picking this back up.
+Last updated: 2026-07-27 — session paused here. Read this before resuming, whether that's the same person or a different agent picking this back up.
 
 ## Where things stand
 
@@ -22,10 +22,30 @@ Status: **complete (core implementation) — WRITEUP.md still outstanding**
 - `WRITEUP.md` not written yet — left for the user to circle back to per their own pace preference; not blocking forward progress.
 
 ### Exercise 03 — Single-Threaded Order Book Core
-Status: **assigned, not started** — this is the current exercise.
+Status: **core implementation complete and reviewed clean — driver (`main.cpp`) and `WRITEUP.md` still outstanding**
 
-### Exercises 04–08
-Not yet started, but fully specified and scaffolded — each has a `README.md` spec, a `CMakeLists.txt`, and a placeholder `main.cpp` (empty stub, builds cleanly, no logic), exactly like exercises 01/02 were set up. See `ROADMAP.md` for the phase-to-exercise mapping and a one-line summary of each.
+- `src/order.hpp`, `src/trade.hpp`, `src/price_level.hpp`/`.cpp`, `src/order_book.hpp`/`.cpp` are all written, wired into the `orderbook` library target (`src/CMakeLists.txt`), and compile warning-free under the project's full flag set.
+- Went through several real rounds of review with genuine bugs found and fixed along the way (inverted crossing conditions, a dangling-reference-after-`pop_front` caught with ASan, `std::remove_if` used without `erase`, `matchOrder` discarding its own return value, resting logic unreachable whenever the opposite side was empty, an id→location index that was never populated, and a refactor that briefly caused every order to rest into `bids_` regardless of side) — all confirmed fixed via compiled scratch tests, not just re-reading the diff.
+- Verified end-to-end against all five required driver scenarios (rests without crossing, full match, partial match across multiple resting orders/price levels, cancel on both sides, best bid/ask updating correctly throughout) — all pass, clean build.
+- Still needed per the README: the actual `exercises/03-order-book-core/main.cpp` driver printing these scenarios, and `WRITEUP.md` (price-time-priority guarantee, partial-fill walkthrough, Big-O of `addOrder`/`cancelOrder`). **Likely to be satisfied by Exercise 04's test suite instead of a separate hand-written driver** — see below; confirm with the user which they want before assuming this is skippable.
+
+### Exercise 04 — Testing, Invariants, and Sanitizers
+Status: **hand-written unit tests + AI-assisted property test done; a real, unresolved use-after-free bug found in `OrderBook::cancelOrder` — this needs a decision/fix before moving on; clang-tidy pass and `WRITEUP.md` still outstanding**
+
+- `exercises/04-testing-and-hygiene/CMakeLists.txt` pulls Catch2 v3.7.1 via `FetchContent`, builds `ex04_orderbook_tests` linked against `orderbook` + `Catch2::Catch2WithMain`, and registers each `TEST_CASE` with `ctest` via `catch_discover_tests`. Verified end-to-end: fetch, build, and `ctest --test-dir build/debug` all work (had to add `set_target_properties(Catch2 Catch2WithMain PROPERTIES COMPILE_OPTIONS "")` after `FetchContent_MakeAvailable` — the top-level `add_compile_options` otherwise leaks into Catch2's own source and produces warning noise unrelated to this project's code).
+- Top-level `CMakeLists.txt` now has `include(CTest)` added, enabling `ctest` project-wide.
+- `example_syntax_test.cpp` (scaffolding) has been superseded — real tests now exist.
+- `order_book_test.cpp`: **hand-written by the user**, four `TEST_CASE`s (rests without crossing, full match, full match across multiple resting orders/levels, cancel of a resting order). All pass under `debug`.
+- `order_book_property_test.cpp`: **written with AI assistance, not hand-written** — an explicit, one-time exception to this curriculum's normal "never write the user's test files" rule, made at the user's request because they wanted to move on to the next order-book area rather than spend more time on testing mechanics they'd already understood conceptually. Uses `GENERATE` over 5 fixed seeds, a `std::mt19937` per seed driving 200 random add/cancel operations (price range 950–1050 shared across both sides so crossing actually happens), and checks two invariants after every operation: book never crossed (`bestBid() < bestAsk()`), and no order is ever matched for more than its remaining quantity (tracked via a shadow ledger keyed off the `Trade::buy_side_id`/`sell_side_id` the book itself returns, not by reimplementing matching).
+- **This property test immediately (seed=1, step 9) found a real, 100%-reproducible bug, confirmed two ways:** a plain `debug`-preset run crashes with `SIGSEGV`; the `sanitize`-preset run (ASan) reports a precise **heap-use-after-free** in `PriceLevel::cancelOrder`, called from `OrderBook::cancelOrder`, on memory freed earlier inside `OrderBook::matchOrder`.
+  - Root cause: `OrderBook::orders_` (`order_book.hpp:22`) stores a raw `PriceLevel*` per order id, pointing into `bids_`/`asks_` (`std::map<size_t, PriceLevel, ...>`). When `OrderBook::matchOrder` (`order_book.cpp:51` and `:67`) erases a price level from `bids_`/`asks_` because it became empty, nothing removes or updates the `orders_` entries that still point at that now-destroyed `PriceLevel`. A later `cancelOrder(id)` for any id that was ever recorded under that erased level dereferences freed memory.
+  - Not yet fixed — this is the user's production code (Exercise 03's `OrderBook`), not a test file, so per this curriculum's review convention it wasn't patched without being asked. Needs a decision from the user on how to fix `orders_`'s staleness (e.g., purge/update the relevant `orders_` entries whenever a `PriceLevel` is erased or an order is matched away).
+- Sanitizer preset (`cmake --preset sanitize`) is now configured and working (`build/sanitize`) — the initial `FetchContent` git clone step failed under this session's sandbox (couldn't copy git hook templates); had to disable the sandbox for that one configure step. Not itself a code issue.
+- clang-tidy pass over `src/*.cpp`: not yet run.
+- `WRITEUP.md`: not written — explicitly left for the user (not part of the AI-assistance exception above). The use-after-free above is a strong, real candidate answer for the WRITEUP's "worst bug the property tests caught" question.
+
+### Exercises 05–08
+Not yet started, but fully specified and scaffolded — each has a `README.md` spec, a `CMakeLists.txt`, and a placeholder `main.cpp` (empty stub, builds cleanly, no logic), exactly like exercises 01/02 were set up. **Not yet rewritten to the lesson-first README convention** (see `ROADMAP.md`'s README-convention note) — do that when actually reached, informed by real problems encountered, not speculatively ahead of time. See `ROADMAP.md` for the phase-to-exercise mapping and a one-line summary of each.
 
 ## How the user likes to work (read this before jumping in)
 

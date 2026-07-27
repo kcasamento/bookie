@@ -1,12 +1,12 @@
-#include <cstddef>
-#include <iterator>
-#include <utility>
-#include <vector>
-#include <map>
-#include "price_level.hpp"
 #include "order_book.hpp"
 #include "order.hpp"
+#include "price_level.hpp"
 #include "trade.hpp"
+#include <cstddef>
+#include <iterator>
+#include <map>
+#include <utility>
+#include <vector>
 
 std::pair<bool, std::vector<Trade>> OrderBook::addOrder(Order o) {
   bool ok = true;
@@ -19,7 +19,7 @@ std::pair<bool, std::vector<Trade>> OrderBook::addOrder(Order o) {
         trades = matchOrder(o);
       }
     }
-    
+
     ok = tryRecordOrder(std::move(o));
   } else {
     auto best = bestBid_();
@@ -36,17 +36,23 @@ std::pair<bool, std::vector<Trade>> OrderBook::addOrder(Order o) {
     return std::pair<bool, std::vector<Trade>>(false, std::vector<Trade>());
   }
 
-    return std::pair<bool, std::vector<Trade>>(true, trades);
+  return std::pair<bool, std::vector<Trade>>(true, trades);
 }
 
-std::vector<Trade> OrderBook::matchOrder(Order& o) {
+std::vector<Trade> OrderBook::matchOrder(Order &o) {
   std::vector<Trade> trades;
   if (o.side == Side::Buy) {
     auto best = bestAsk_();
-    while(o.quantity > 0 && best != nullptr && o.price >= best->getLevel()) {
+    while (o.quantity > 0 && best != nullptr && o.price >= best->getLevel()) {
       auto t = best->matchOrder(o);
-      std::move(t.begin(), t.end(), std::back_inserter(trades));
-      
+      trades.reserve(trades.size() + t.size());
+      for (auto &tr : t) {
+        trades.push_back(std::move(tr));
+        if (tr.resting_remaining == 0) {
+          orders_.erase(tr.sell_side_id);
+        }
+      }
+
       if (best->empty()) {
         asks_.erase(asks_.begin());
       }
@@ -55,12 +61,15 @@ std::vector<Trade> OrderBook::matchOrder(Order& o) {
     }
   } else {
     auto best = bestBid_();
-    while(o.quantity > 0 && best != nullptr && o.price <= best->getLevel()) {
+    while (o.quantity > 0 && best != nullptr && o.price <= best->getLevel()) {
       auto t = best->matchOrder(o);
 
       trades.reserve(trades.size() + t.size());
-      for(auto& tr : t) {
+      for (auto &tr : t) {
         trades.push_back(std::move(tr));
+        if (tr.resting_remaining == 0) {
+          orders_.erase(tr.buy_side_id);
+        }
       }
 
       if (best->empty()) {
@@ -69,8 +78,8 @@ std::vector<Trade> OrderBook::matchOrder(Order& o) {
       best = bestBid_();
     }
   }
-  
-  return trades;  
+
+  return trades;
 }
 
 void OrderBook::cancelOrder(size_t id) {
@@ -83,7 +92,7 @@ void OrderBook::cancelOrder(size_t id) {
 
   if (node.mapped().first == Side::Buy) {
     if (node.mapped().second->empty()) {
-      // delete from bids_ 
+      // delete from bids_
       bids_.erase(node.mapped().second->getLevel());
     }
   } else {
@@ -113,16 +122,16 @@ std::optional<size_t> OrderBook::bestAsk() {
   return std::optional<size_t>(pl->getLevel());
 }
 
-PriceLevel* OrderBook::bestBid_() {
-  if(bids_.empty()) {
+PriceLevel *OrderBook::bestBid_() {
+  if (bids_.empty()) {
     return nullptr;
   }
 
   return &bids_.begin()->second;
 }
 
-PriceLevel* OrderBook::bestAsk_() {
-  if(asks_.empty()) {
+PriceLevel *OrderBook::bestAsk_() {
+  if (asks_.empty()) {
     return nullptr;
   }
 
@@ -135,7 +144,7 @@ bool OrderBook::tryRecordOrder(Order o) {
   }
 
   // ensure we have a price level
-  PriceLevel* level;
+  PriceLevel *level;
   if (o.side == Side::Buy) {
     auto [it, inserted] = bids_.try_emplace(o.price, PriceLevel(o.price));
     level = &it->second;

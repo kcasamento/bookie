@@ -8,5 +8,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_compile_options(-Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wsign-conversion)
 
+include(CTest)   # enables testing() + registers the `ctest` driver project-wide
+
 add_subdirectory(exercises)
 add_subdirectory(src)
