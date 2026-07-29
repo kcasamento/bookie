@@ -12,3 +12,5 @@ include(CTest)   # enables testing() + registers the `ctest` driver project-wide
 
 add_subdirectory(exercises)
 add_subdirectory(src)
+add_subdirectory(test)
+add_subdirectory(benchmark)

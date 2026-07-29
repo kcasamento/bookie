@@ -1,48 +1,124 @@
 #include "price_level.hpp"
 #include <algorithm>
 
-bool PriceLevel::addOrder(Order o) {
-  if (level_ != o.price) {
+bool PriceLevel::addOrder(Order *o) {
+  if (level_ != o->price) {
     return false;
   }
 
-  orders_.push_back(std::move(o));
+  append(o);
+
   return true;
 }
 
 std::vector<Trade> PriceLevel::matchOrder(Order &o) {
   std::vector<Trade> trades;
-  while (o.quantity > 0 && !orders_.empty()) {
-    Order &in = orders_.front();
+  while (o.quantity > 0 && !empty()) {
+    Order *&in = head_;
     // if I am looking for 100 units (o)
     // and i have 200 unit avail (in)
     // we only need 100
     // if I am looking for 50 units (o)
     // and I have 10 unit avail (in)
     // I can only fill 10 units
-    size_t amt = std::min(o.quantity, in.quantity);
+    size_t amt = std::min(o.quantity, in->quantity);
 
     o.quantity -= amt;
-    in.quantity -= amt;
+    in->quantity -= amt;
 
     // capture the trade
     if (o.side == Side::Buy) {
-      trades.push_back(Trade(o.id, in.id, level_, amt, in.quantity));
+      trades.push_back(Trade(o.id, in->id, level_, amt, in->quantity));
     } else {
-      trades.push_back(Trade(in.id, o.id, level_, amt, in.quantity));
+      trades.push_back(Trade(in->id, o.id, level_, amt, in->quantity));
     }
 
     // completely filled, remove
-    if (in.quantity == 0) {
-      orders_.pop_front();
+    if (in->quantity == 0) {
+      pop();
     }
   }
   return trades;
 }
 
-void PriceLevel::cancelOrder(size_t id) {
-  orders_.erase(std::remove_if(orders_.begin(), orders_.end(),
-                               [id](const Order &o) { return o.id == id; }),
-                orders_.end());
+void PriceLevel::cancelOrder(Order *o) { remove(o); }
+
+void PriceLevel::append(Order *o) {
+  if (head_ == nullptr || tail_ == nullptr) {
+    head_ = o;
+    tail_ = o;
+    return;
+  }
+
+  o->prev = tail_;
+  tail_->next = o;
+  tail_ = o;
+}
+
+Order *PriceLevel::pop() {
+  if (head_ == tail_) {
+    Order *tmp = head_;
+    head_ = nullptr;
+    tail_ = nullptr;
+
+    return tmp;
+  }
+
+  Order *tmp = head_;
+
+  head_->next->prev = nullptr;
+  head_ = head_->next;
+
+  tmp->next = nullptr;
+  tmp->prev = nullptr;
+
+  return tmp;
+}
+
+Order *PriceLevel::dequeue() {
+  if (head_ == tail_) {
+    Order *tmp = tail_;
+    head_ = nullptr;
+    tail_ = nullptr;
+    return tmp;
+  }
+
+  Order *tmp = tail_;
+  tail_->prev->next = nullptr;
+  tail_ = tail_->prev;
+  tmp->next = nullptr;
+  tmp->prev = nullptr;
+
+  return tmp;
+}
+
+void PriceLevel::remove(Order *o) {
+  // 1 item
+  if (head_ == tail_ && head_ == o) {
+    head_ = nullptr;
+    tail_ = nullptr;
+    return;
+  }
+
+  // first item
+  if (head_ == o) {
+    pop();
+    return;
+  }
+
+  // last item
+  if (tail_ == o) {
+    dequeue();
+    return;
+  }
+
+  // middle
+  Order *tmp = o->prev;
+  o->prev->next = o->next;
+  o->next->prev = tmp;
+
+  o->next = nullptr;
+  o->prev = nullptr;
+
   return;
 }

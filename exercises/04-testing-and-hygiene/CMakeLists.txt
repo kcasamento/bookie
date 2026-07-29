@@ -13,9 +13,9 @@ FetchContent_MakeAvailable(Catch2)
 # to every target defined in a subdirectory it pulls in. Clear it explicitly instead.
 set_target_properties(Catch2 Catch2WithMain PROPERTIES COMPILE_OPTIONS "")
 
-add_executable(ex04_orderbook_tests order_book_test.cpp order_book_property_test.cpp)
-target_link_libraries(ex04_orderbook_tests PRIVATE orderbook Catch2::Catch2WithMain)
+# add_executable(ex04_orderbook_tests order_book_test.cpp order_book_property_test.cpp)
+# target_link_libraries(ex04_orderbook_tests PRIVATE orderbook Catch2::Catch2WithMain)
 
 list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
 include(Catch)
-catch_discover_tests(ex04_orderbook_tests)
+# catch_discover_tests(ex04_orderbook_tests)
