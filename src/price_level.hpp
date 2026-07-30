@@ -15,8 +15,8 @@ public:
   bool empty() const { return head_ == nullptr; }
 
   bool addOrder(Order *o);
-  std::vector<Trade> matchOrder(Order &o);
-  void cancelOrder(Order *o);
+  uint16_t matchOrder(Order &o, std::vector<Trade> &t);
+  bool cancelOrder(Order *o);
 
 private:
   Order *head_;

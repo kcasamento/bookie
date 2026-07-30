@@ -2,6 +2,8 @@
 
 #include <cstddef>
 
+struct PriceLevel;
+
 enum class Side {
   NotSet,
   Buy,
@@ -12,14 +14,15 @@ struct Order {
 public:
   Order *next;
   Order *prev;
+  PriceLevel *restingAt;
   size_t id;
   size_t price;
   size_t quantity;
   Side side;
 
   explicit Order(size_t id_, size_t price_, size_t quantity_, Side side_)
-      : next(nullptr), prev(nullptr), id(id_), price(price_),
-        quantity(quantity_), side(side_) {}
+      : next(nullptr), prev(nullptr), restingAt(nullptr), id(id_),
+        price(price_), quantity(quantity_), side(side_) {}
 
   Order()
       : next(nullptr), prev(nullptr), id(0), price(0), quantity(0),

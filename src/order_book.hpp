@@ -60,24 +60,24 @@ public:
   }
 
   std::vector<Trade> matchOrder(Order &o) {
-    std::vector<Trade> trades;
+    std::vector<Trade> trades = {};
     if (o.side == Side::Buy) {
+      trades.reserve(asks_.size());
       auto best = bestAsk_();
       while (o.quantity > 0 && best != nullptr && o.price >= best->getLevel()) {
-        auto t = best->matchOrder(o);
-        trades.reserve(trades.size() + t.size());
-        for (auto &tr : t) {
-          trades.push_back(std::move(tr));
+        auto cnt = best->matchOrder(o, trades);
+
+        for (size_t i = trades.size() - cnt; i < trades.size(); ++i) {
+          auto tr = trades.at(i);
           if (tr.resting_remaining == 0) {
             auto node = orders_.find(tr.sell_side_id);
             if (node != orders_.end()) {
-              Order *tmp = node->second.first;
+              Order *tmp = node->second;
               orders_.erase(node);
               orderPool_.deallocate(tmp);
             }
           }
         }
-
         if (best->empty()) {
           resetBestAsk_();
         }
@@ -85,17 +85,17 @@ public:
         best = bestAsk_();
       }
     } else {
+      trades.reserve(bids_.size());
       auto best = bestBid_();
       while (o.quantity > 0 && best != nullptr && o.price <= best->getLevel()) {
-        auto t = best->matchOrder(o);
+        uint16_t cnt = best->matchOrder(o, trades);
 
-        trades.reserve(trades.size() + t.size());
-        for (auto &tr : t) {
-          trades.push_back(std::move(tr));
+        for (size_t i = trades.size() - cnt; i < trades.size(); ++i) {
+          auto tr = trades.at(i);
           if (tr.resting_remaining == 0) {
             auto node = orders_.find(tr.buy_side_id);
             if (node != orders_.end()) {
-              Order *tmp = node->second.first;
+              Order *tmp = node->second;
               orders_.erase(node);
               orderPool_.deallocate(tmp);
             }
@@ -118,18 +118,17 @@ public:
       return;
     }
 
-    Order *o = node.mapped().first;
-    PriceLevel *pl = node.mapped().second;
+    Order *o = node.mapped();
 
-    pl->cancelOrder(o);
+    bool empty = o->restingAt->cancelOrder(o);
 
     if (o->side == Side::Buy) {
-      if (pl->empty()) {
+      if (empty) {
         // delete from bids_
         resetBestBid_();
       }
     } else {
-      if (pl->empty()) {
+      if (empty) {
         // delete from asks_
         resetBestAsk_();
       }
@@ -162,7 +161,7 @@ private:
   size_t maxPrice_;
   size_t maxSpread_;
   OrderPool<Order, Capacity> orderPool_;
-  std::unordered_map<size_t, std::pair<Order *, PriceLevel *>> orders_;
+  std::unordered_map<size_t, Order *> orders_;
 
   std::optional<size_t> bestBidIdx_;
   std::optional<size_t> bestAskIdx_;
@@ -281,7 +280,7 @@ private:
     }
 
     // add the order to the orders map
-    orders_.try_emplace(order->id, std::pair(order, level));
+    orders_.try_emplace(order->id, order);
     return true;
   }
 };

@@ -1,5 +1,6 @@
 #include "price_level.hpp"
 #include <algorithm>
+#include <cstdint>
 
 bool PriceLevel::addOrder(Order *o) {
   if (level_ != o->price) {
@@ -7,14 +8,15 @@ bool PriceLevel::addOrder(Order *o) {
   }
 
   append(o);
+  o->restingAt = this;
 
   return true;
 }
 
-std::vector<Trade> PriceLevel::matchOrder(Order &o) {
-  std::vector<Trade> trades;
+uint16_t PriceLevel::matchOrder(Order &o, std::vector<Trade> &trades) {
+  uint16_t tradeCount = 0;
   while (o.quantity > 0 && !empty()) {
-    Order *&in = head_;
+    Order *in = head_;
     // if I am looking for 100 units (o)
     // and i have 200 unit avail (in)
     // we only need 100
@@ -32,16 +34,22 @@ std::vector<Trade> PriceLevel::matchOrder(Order &o) {
     } else {
       trades.push_back(Trade(in->id, o.id, level_, amt, in->quantity));
     }
+    ++tradeCount;
 
     // completely filled, remove
     if (in->quantity == 0) {
       pop();
+      in->restingAt = nullptr;
     }
   }
-  return trades;
+  return tradeCount;
 }
 
-void PriceLevel::cancelOrder(Order *o) { remove(o); }
+bool PriceLevel::cancelOrder(Order *o) {
+  remove(o);
+  o->restingAt = nullptr;
+  return empty();
+}
 
 void PriceLevel::append(Order *o) {
   if (head_ == nullptr || tail_ == nullptr) {
@@ -93,6 +101,10 @@ Order *PriceLevel::dequeue() {
 }
 
 void PriceLevel::remove(Order *o) {
+  if (head_ == nullptr || tail_ == nullptr) {
+    return;
+  }
+
   // 1 item
   if (head_ == tail_ && head_ == o) {
     head_ = nullptr;
